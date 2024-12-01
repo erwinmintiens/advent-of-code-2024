@@ -6,12 +6,8 @@ pub fn part_one(input: &str) -> Option<u32> {
     let mut vec2: Vec<u32> = Vec::new();
     for record in list {
         let mut parts = record.split_whitespace();
-        let part1 = parts.next();
-        let part2 = parts.next();
-        let part1 = part1.unwrap().parse::<u32>().unwrap();
-        let part2 = part2.unwrap().parse::<u32>().unwrap();
-        vec1.push(part1);
-        vec2.push(part2);
+        vec1.push(parts.next().unwrap().parse::<u32>().unwrap());
+        vec2.push(parts.next().unwrap().parse::<u32>().unwrap());
     }
     vec1.sort();
     vec2.sort();
@@ -30,10 +26,8 @@ pub fn part_two(input: &str) -> Option<u32> {
     let mut vec2: Vec<u32> = Vec::new();
     for record in list {
         let mut parts = record.split_whitespace();
-        let part1 = parts.next();
-        let part2 = parts.next();
-        vec1.push(part1.unwrap().parse::<u32>().unwrap());
-        vec2.push(part2.unwrap().parse::<u32>().unwrap());
+        vec1.push(parts.next().unwrap().parse::<u32>().unwrap());
+        vec2.push(parts.next().unwrap().parse::<u32>().unwrap());
     }
     let mut result: u32 = 0;
     for value in vec1 {
