@@ -65,9 +65,59 @@ fn get_middle_page(update_record: &Vec<u8>) -> u8 {
 }
 
 pub fn part_two(input: &str) -> Option<u32> {
-    None
+    let input_vec: Vec<&str> = input.split_terminator("\n").collect();
+    let (ordering_rules, updates) = get_ordering_rules_and_updates(&input_vec);
+    Some(check_part_2(&updates, &ordering_rules))
 }
 
+fn check_part_2(updates: &Vec<Vec<u8>>, ordering_rules: &Vec<(u8, u8)>) -> u32 {
+    let mut result: u32 = 0;
+    for update in updates {
+        let (mut new_record, mut is_valid) = scramble(&update, ordering_rules);
+        if is_valid {
+            continue;
+        }
+        while !is_valid {
+            (new_record, is_valid) = scramble(&new_record, ordering_rules);
+        }
+        result += get_middle_page(&new_record) as u32;
+    }
+    result
+}
+
+fn scramble(record: &Vec<u8>, ordering_rules: &Vec<(u8, u8)>) -> (Vec<u8>, bool) {
+    let mut processed_pages: Vec<u8> = Vec::new();
+    let mut is_valid = true;
+
+    for page_number in record {
+        if processed_pages.contains(&page_number) {
+            continue;
+        }
+        let mut number_to_search = *page_number;
+        let mut order: Vec<u8> = vec![*page_number];
+        while ordering_rules.iter().any(|&(first, second)| {
+            second == number_to_search
+                && !processed_pages.contains(&first)
+                && record.contains(&first)
+        }) {
+            is_valid = false;
+            number_to_search = ordering_rules
+                .iter()
+                .filter(|&(first, second)| {
+                    second == &number_to_search
+                        && !processed_pages.contains(&first)
+                        && record.contains(&first)
+                })
+                .next()
+                .unwrap()
+                .0;
+            order.push(number_to_search);
+        }
+        order.reverse();
+        processed_pages.append(&mut order);
+    }
+    (processed_pages, is_valid)
+}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -81,6 +131,6 @@ mod tests {
     #[test]
     fn test_part_two() {
         let result = part_two(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, None);
+        assert_eq!(result, Some(123));
     }
 }
