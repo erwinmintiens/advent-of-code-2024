@@ -2,37 +2,86 @@ advent_of_code::solution!(6);
 
 pub fn part_one(input: &str) -> Option<u32> {
     let input_vec: Vec<&str> = input.split_terminator("\n").collect();
-    let (x, y) = get_starting_position(&input_vec);
-    let coordinates: Coordinates = Coordinates::new(x, y);
-    Some(handle_part_1(input_vec, coordinates))
+    let map = Map::new(input_vec);
+    let mut starting_position = Coordinates::new(0, 0);
+    if let Some((x, y)) = map.get_starting_position() {
+        starting_position = Coordinates::new(x, y);
+    }
+    let mut guard = Guard::new(Direction::Up, starting_position);
+    guard.walk_with_map(&map);
+    Some(guard.steps_taken.len() as u32)
 }
 
 pub fn part_two(input: &str) -> Option<u32> {
     let input_vec: Vec<&str> = input.split_terminator("\n").collect();
-    let (x, y) = get_starting_position(&input_vec);
-    let coordinates: Coordinates = Coordinates::new(x, y);
-    Some(handle_part_2(input_vec, coordinates))
-}
-
-fn handle_part_1(vec: Vec<&str>, starting_position: Coordinates) -> u32 {
+    let map = Map::new(input_vec);
+    let mut starting_position = Coordinates::new(0, 0);
+    if let Some((x, y)) = map.get_starting_position() {
+        starting_position = Coordinates::new(x, y);
+    }
     let mut guard = Guard::new(Direction::Up, starting_position);
-    guard.walk(&vec);
-    guard.steps_taken.len() as u32
+    guard.walk_with_map(&map);
+    Some(guard.number_of_obstacles)
 }
 
-fn handle_part_2(vec: Vec<&str>, starting_position: Coordinates) -> u32 {
-    let mut guard = Guard::new(Direction::Up, starting_position);
-    guard.walk(&vec);
-    guard.number_of_obstacles
+struct Map<'a> {
+    layout: Vec<&'a str>,
 }
 
-fn get_starting_position(vec: &Vec<&str>) -> (usize, usize) {
-    for (y, record) in vec.iter().enumerate() {
-        if let Some(x) = record.find('^') {
-            return (x, y);
+impl<'a> Map<'a> {
+    fn new(layout: Vec<&'a str>) -> Self {
+        Self { layout }
+    }
+
+    fn get_starting_position(&self) -> Option<(usize, usize)> {
+        for (y, record) in self.layout.iter().enumerate() {
+            if let Some(x) = record.find('^') {
+                return Some((x, y));
+            }
+        }
+        None
+    }
+
+    fn get_next_char(
+        &self,
+        current_position: Coordinates,
+        moving_direction: Direction,
+    ) -> Option<char> {
+        match moving_direction {
+            Direction::Up => {
+                if current_position.y == 0 {
+                    return None;
+                }
+                return self.layout[current_position.y - 1]
+                    .chars()
+                    .nth(current_position.x);
+            }
+            Direction::Down => {
+                if current_position.y == self.layout.len() - 1 {
+                    return None;
+                }
+                return self.layout[current_position.y + 1]
+                    .chars()
+                    .nth(current_position.x);
+            }
+            Direction::Right => {
+                if current_position.x == self.layout[0].len() - 1 {
+                    return None;
+                }
+                return self.layout[current_position.y]
+                    .chars()
+                    .nth(current_position.x + 1);
+            }
+            Direction::Left => {
+                if current_position.x == 0 {
+                    return None;
+                }
+                return self.layout[current_position.y]
+                    .chars()
+                    .nth(current_position.x - 1);
+            }
         }
     }
-    panic!("No '^' found!")
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -75,20 +124,32 @@ impl Guard {
         }
     }
 
-    fn walk(&mut self, input: &Vec<&str>) {
-        self.steps_taken.push(self.position.clone());
-        self.turn_list.push((self.position, self.walking_direction));
-        while !self.check_direction(input) {
-            self.check_right_direction(input);
-            self.take_step();
+    fn turn_right(&mut self) {
+        match self.walking_direction {
+            Direction::Up => self.walking_direction = Direction::Right,
+            Direction::Down => self.walking_direction = Direction::Left,
+            Direction::Right => self.walking_direction = Direction::Down,
+            Direction::Left => self.walking_direction = Direction::Up,
         }
     }
 
-    fn check_right_direction(&mut self, input: &Vec<&str>) {
-        println!(
-            "current position: {:?}, direction: {:?}",
-            self.position, self.walking_direction
-        );
+    fn walk_with_map(&mut self, map: &Map) {
+        self.steps_taken.push(self.position);
+        self.turn_list.push((self.position, self.walking_direction));
+        while let Some(c) = map.get_next_char(self.position, self.walking_direction) {
+            if c == '#' {
+                self.turn_right();
+                self.turn_list.push((self.position, self.walking_direction));
+            }
+            self.check_right_direction(map);
+            self.take_step();
+        }
+    }
+    fn check_right_direction(&mut self, map: &Map) {
+        // println!(
+        //     "current position: {:?}, direction: {:?}",
+        //     self.position, self.walking_direction
+        // );
         match self.walking_direction {
             Direction::Up => {
                 let dirs: Vec<&(Coordinates, Direction)> = self
@@ -100,10 +161,9 @@ impl Guard {
                             && *dir == Direction::Down
                     })
                     .collect();
-                println!("DIRS: {:?}", dirs);
+                // println!("DIRS: {:?}", dirs);
                 if let Some(&(coord, _)) = dirs.iter().min_by_key(|&(coord, _)| coord.x) {
-                    if !input[self.position.y][self.position.x..coord.x].contains('#') {
-                        println!("Increased");
+                    if !map.layout[self.position.y][self.position.x..coord.x].contains('#') {
                         self.number_of_obstacles += 1;
                     }
                 }
@@ -118,10 +178,9 @@ impl Guard {
                             && *dir == Direction::Up
                     })
                     .collect();
-                println!("DIRS: {:?}", dirs);
+                // println!("DIRS: {:?}", dirs);
                 if let Some(&(coord, _)) = dirs.iter().max_by_key(|&(coord, _)| coord.x) {
-                    if !input[self.position.y][coord.x..self.position.x].contains('#') {
-                        println!("Increased");
+                    if !map.layout[self.position.y][coord.x..self.position.x].contains('#') {
                         self.number_of_obstacles += 1;
                     }
                 }
@@ -136,18 +195,17 @@ impl Guard {
                             && *dir == Direction::Left
                     })
                     .collect();
-                println!("DIRS: {:?}", dirs);
+                // println!("DIRS: {:?}", dirs);
                 if let Some(&(coord, _)) = dirs.iter().min_by_key(|&(coord, _)| coord.y) {
                     let mut found_hash = false;
                     for i in self.position.y..coord.y {
-                        if let Some(s) = input.get(i) {
+                        if let Some(s) = map.layout.get(i) {
                             if s.chars().nth(self.position.x) == Some('#') {
                                 found_hash = true;
                             }
                         }
                     }
                     if !found_hash {
-                        println!("Increased");
                         self.number_of_obstacles += 1;
                     }
                 }
@@ -162,18 +220,17 @@ impl Guard {
                             && *dir == Direction::Right
                     })
                     .collect();
-                println!("DIRS: {:?}", dirs);
+                // println!("DIRS: {:?}", dirs);
                 if let Some(&(coord, _)) = dirs.iter().max_by_key(|&(coord, _)| coord.y) {
                     let mut found_hash = false;
                     for i in coord.y..self.position.y {
-                        if let Some(s) = input.get(i) {
+                        if let Some(s) = map.layout.get(i) {
                             if s.chars().nth(self.position.x) == Some('#') {
                                 found_hash = true;
                             }
                         }
                     }
                     if !found_hash {
-                        println!("Increased");
                         self.number_of_obstacles += 1;
                     }
                 }
@@ -191,72 +248,6 @@ impl Guard {
         if !self.steps_taken.contains(&self.position) {
             self.steps_taken.push(self.position.clone());
         }
-    }
-
-    fn check_direction(&mut self, input: &Vec<&str>) -> bool {
-        let mut changed_direction = false;
-        match self.walking_direction {
-            Direction::Up => {
-                if self.position.y == 0 {
-                    return true;
-                }
-                if input[self.position.y - 1]
-                    .chars()
-                    .nth(self.position.x)
-                    .unwrap()
-                    == '#'
-                {
-                    self.walking_direction = Direction::Right;
-                    changed_direction = true;
-                }
-            }
-            Direction::Down => {
-                if self.position.y + 1 == input.len() {
-                    return true;
-                }
-                if input[self.position.y + 1]
-                    .chars()
-                    .nth(self.position.x)
-                    .unwrap()
-                    == '#'
-                {
-                    self.walking_direction = Direction::Left;
-                    changed_direction = true;
-                }
-            }
-            Direction::Left => {
-                if self.position.x == 0 {
-                    return true;
-                }
-                if input[self.position.y]
-                    .chars()
-                    .nth(self.position.x - 1)
-                    .unwrap()
-                    == '#'
-                {
-                    self.walking_direction = Direction::Up;
-                    changed_direction = true;
-                }
-            }
-            Direction::Right => {
-                if self.position.x + 1 == input[0].len() {
-                    return true;
-                }
-                if input[self.position.y]
-                    .chars()
-                    .nth(self.position.x + 1)
-                    .unwrap()
-                    == '#'
-                {
-                    self.walking_direction = Direction::Down;
-                    changed_direction = true;
-                }
-            }
-        }
-        if changed_direction {
-            self.turn_list.push((self.position, self.walking_direction));
-        }
-        false
     }
 }
 
