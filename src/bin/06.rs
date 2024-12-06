@@ -42,6 +42,23 @@ impl<'a> Map<'a> {
         None
     }
 
+    fn has_hash_between_coordinates(&self, coord1: Coordinates, coord2: Coordinates) -> bool {
+        if coord1.x != coord2.x && coord1.y != coord2.y {
+            panic!("Checking unrelated coordinates: {:?}, {:?}", coord1, coord2);
+        } else if coord1.x == coord2.x {
+            for i in coord1.y..coord2.y {
+                if let Some(s) = self.layout.get(i) {
+                    if s.chars().nth(coord1.x) == Some('#') {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        } else {
+            return self.layout[coord1.y][coord1.x..coord2.x].contains('#');
+        }
+    }
+
     fn get_next_char(
         &self,
         current_position: Coordinates,
@@ -133,6 +150,18 @@ impl Guard {
         }
     }
 
+    fn take_step(&mut self) {
+        match self.walking_direction {
+            Direction::Up => self.position.y -= 1,
+            Direction::Down => self.position.y += 1,
+            Direction::Right => self.position.x += 1,
+            Direction::Left => self.position.x -= 1,
+        }
+        if !self.steps_taken.contains(&self.position) {
+            self.steps_taken.push(self.position.clone());
+        }
+    }
+
     fn walk_with_map(&mut self, map: &Map) {
         self.steps_taken.push(self.position);
         self.turn_list.push((self.position, self.walking_direction));
@@ -141,15 +170,16 @@ impl Guard {
                 self.turn_right();
                 self.turn_list.push((self.position, self.walking_direction));
             }
-            self.check_right_direction(map);
+            self.check_path_to_the_right(map);
             self.take_step();
         }
     }
-    fn check_right_direction(&mut self, map: &Map) {
-        // println!(
-        //     "current position: {:?}, direction: {:?}",
-        //     self.position, self.walking_direction
-        // );
+
+    fn check_path_to_the_right(&mut self, map: &Map) {
+        println!(
+            "current position: {:?}, direction: {:?}",
+            self.position, self.walking_direction
+        );
         match self.walking_direction {
             Direction::Up => {
                 let dirs: Vec<&(Coordinates, Direction)> = self
@@ -161,9 +191,10 @@ impl Guard {
                             && *dir == Direction::Down
                     })
                     .collect();
-                // println!("DIRS: {:?}", dirs);
+                println!("DIRS: {:?}", dirs);
                 if let Some(&(coord, _)) = dirs.iter().min_by_key(|&(coord, _)| coord.x) {
-                    if !map.layout[self.position.y][self.position.x..coord.x].contains('#') {
+                    if !map.has_hash_between_coordinates(self.position, *coord) {
+                        println!("Increased");
                         self.number_of_obstacles += 1;
                     }
                 }
@@ -178,9 +209,10 @@ impl Guard {
                             && *dir == Direction::Up
                     })
                     .collect();
-                // println!("DIRS: {:?}", dirs);
+                println!("DIRS: {:?}", dirs);
                 if let Some(&(coord, _)) = dirs.iter().max_by_key(|&(coord, _)| coord.x) {
-                    if !map.layout[self.position.y][coord.x..self.position.x].contains('#') {
+                    if !map.has_hash_between_coordinates(*coord, self.position) {
+                        println!("Increased");
                         self.number_of_obstacles += 1;
                     }
                 }
@@ -195,17 +227,10 @@ impl Guard {
                             && *dir == Direction::Left
                     })
                     .collect();
-                // println!("DIRS: {:?}", dirs);
+                println!("DIRS: {:?}", dirs);
                 if let Some(&(coord, _)) = dirs.iter().min_by_key(|&(coord, _)| coord.y) {
-                    let mut found_hash = false;
-                    for i in self.position.y..coord.y {
-                        if let Some(s) = map.layout.get(i) {
-                            if s.chars().nth(self.position.x) == Some('#') {
-                                found_hash = true;
-                            }
-                        }
-                    }
-                    if !found_hash {
+                    if !map.has_hash_between_coordinates(self.position, *coord) {
+                        println!("Increased");
                         self.number_of_obstacles += 1;
                     }
                 }
@@ -220,33 +245,14 @@ impl Guard {
                             && *dir == Direction::Right
                     })
                     .collect();
-                // println!("DIRS: {:?}", dirs);
+                println!("DIRS: {:?}", dirs);
                 if let Some(&(coord, _)) = dirs.iter().max_by_key(|&(coord, _)| coord.y) {
-                    let mut found_hash = false;
-                    for i in coord.y..self.position.y {
-                        if let Some(s) = map.layout.get(i) {
-                            if s.chars().nth(self.position.x) == Some('#') {
-                                found_hash = true;
-                            }
-                        }
-                    }
-                    if !found_hash {
+                    if !map.has_hash_between_coordinates(*coord, self.position) {
+                        println!("Increased");
                         self.number_of_obstacles += 1;
                     }
                 }
             }
-        }
-    }
-
-    fn take_step(&mut self) {
-        match self.walking_direction {
-            Direction::Up => self.position.y -= 1,
-            Direction::Down => self.position.y += 1,
-            Direction::Right => self.position.x += 1,
-            Direction::Left => self.position.x -= 1,
-        }
-        if !self.steps_taken.contains(&self.position) {
-            self.steps_taken.push(self.position.clone());
         }
     }
 }
